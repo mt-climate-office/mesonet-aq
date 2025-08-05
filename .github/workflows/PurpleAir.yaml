@@ -1,0 +1,43 @@
+name: Fetch PurpleAir Data
+
+permissions: write-all
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Every day at 1:00 AM
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Upgrade pip
+        run: pip install --upgrade pip
+        
+      
+      - name: Install dependencies
+        run: pip install pandas pyarrow s3fs boto3 requests
+      
+      - name: Run sensor data fetch script
+        env:
+          PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
+        run: python archive-purpleair.py
+      
+      - name: commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
+          git add .
+          git diff --quiet --cached || git commit -m "Update sensor data [auto]"
+          git push origin HEAD
