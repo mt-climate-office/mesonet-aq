@@ -29,6 +29,7 @@ jobs:
       - name: Run sensor data fetch script
         env:
           PURPLEAIR_API_KEY: ${{ secrets.PURPLEAIR_API_KEY }}
+          AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_TOKEN }}
         run: python archive-purpleair.py
       
       - name: commit
