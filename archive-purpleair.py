@@ -205,11 +205,11 @@ def main():
     #session = boto3_session_with_sso("umt-sso")
     session = boto3_session_with_github_actions()
     
-    creds = session.get_credentials().get_frozen_credentials()
+    #creds = session.get_credentials().get_frozen_credentials()
     s3fs_filesystem = s3fs.S3FileSystem(
-        key=creds.access_key,
-        secret=creds.secret_key,
-        token=creds.token
+        #key=creds.access_key,
+        #secret=creds.secret_key,
+        #token=creds.token
     )
     
     for sensor in sensors:
