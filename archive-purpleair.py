@@ -126,9 +126,7 @@ def boto3_session_with_sso(profile_name):
         return boto3.Session(profile_name=profile_name)
     
 def boto3_session_with_github_actions():
-    sts = boto3.client("s3")
-
-    sts.get_caller_identity()
+    session = boto3.client("s3")
     return session
 
 def upload_to_s3(df, s3_bucket, base_prefix, s3fs_filesystem, partition_cols=["station", "date"]):
