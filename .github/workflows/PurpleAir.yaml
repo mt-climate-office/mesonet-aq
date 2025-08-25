@@ -1,6 +1,8 @@
 name: Fetch PurpleAir Data
 
-permissions: write-all
+permissions: 
+  contents: write
+  id-token: write
 
 on:
   schedule:
@@ -22,7 +24,17 @@ jobs:
       - name: Upgrade pip
         run: pip install --upgrade pip
         
-      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@main # Or a specific version
+        with:
+          role-to-assume: mco_mesonet-aq_s3-access
+          aws-region: us-east-2
+          
+      - name: Additional steps
+        run: |
+          # Your commands that require AWS credentials
+          aws sts get-caller-identity 
+          
       - name: Install dependencies
         run: pip install pandas pyarrow s3fs boto3 requests
       

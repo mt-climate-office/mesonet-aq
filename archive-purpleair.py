@@ -124,6 +124,12 @@ def boto3_session_with_sso(profile_name):
 
         # Recreate session after login
         return boto3.Session(profile_name=profile_name)
+    
+def boto3_session_with_github_actions():
+    sts = boto3.client("s3")
+
+    sts.get_caller_identity()
+    return session
 
 def upload_to_s3(df, s3_bucket, base_prefix, s3fs_filesystem, partition_cols=["station", "date"]):
     if df.empty:
@@ -198,7 +204,9 @@ def main():
     
     existing_partitions = load_parquet_manifest(bucket = "mco-mesonet", prefix = "air-quality")
 
-    session = boto3_session_with_sso("umt-sso")
+    #session = boto3_session_with_sso("umt-sso")
+    session = boto3_session_with_github_actions()
+    
     creds = session.get_credentials().get_frozen_credentials()
     s3fs_filesystem = s3fs.S3FileSystem(
         key=creds.access_key,
