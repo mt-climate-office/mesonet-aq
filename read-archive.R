@@ -2,11 +2,8 @@ library(arrow)
 library(tidyverse)
 library(magrittr)
 
-
-
 ## Some of the sensors produce missing data, which screws up parquet reads.
 ## This function reads everything then casts problematic columns as strings.
-
 
 # Step 1: Open the dataset
 ds <- 
