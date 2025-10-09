@@ -1,6 +1,5 @@
 library(arrow)
 library(tidyverse)
-library(magrittr)
 
 ## Some of the sensors produce missing data, which screws up parquet reads.
 ## This function reads everything then casts problematic columns as strings.
@@ -11,9 +10,8 @@ ds <-
 
 # Step 2: Inspect column types
 types <- 
-  ds$schema$fields %>%
-  magrittr::set_names(.,
-                      purrr::map_chr(., ~ .x$name))
+  ds$schema$fields 
+names(types) <- purrr::map_chr(types, ~ .x$name)
 
 # Step 3: Identify fields with null or problematic types
 # This is a simplified heuristic: you may need to inspect actual files for full accuracy
@@ -34,10 +32,8 @@ ds_fixed <-
   open_dataset("s3://mco-mesonet/air-quality", schema = custom_schema)
 
 # Now, you can query server side and then collect
-ds_fixed %>%
+ds_fixed |>
   filter(station == "mcolubre",
          time_stamp >= lubridate::as_datetime("2025-10-07"),
-         time_stamp < lubridate::as_datetime("2025-10-08")) %>%
+         time_stamp < lubridate::as_datetime("2025-10-08")) |>
   collect()
-
-
