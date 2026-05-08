@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Montana Mesonet — Air Quality Explorer</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.1.6/css/dataTables.dataTables.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Montana Mesonet — Air Quality Explorer</h1>
+    <div id="status" class="status">Initializing…</div>
+  </header>
+  <main>
+    <aside id="sidebar">
+      <h2>Station</h2>
+      <select id="station-select"></select>
+
+      <h2>Date range</h2>
+      <label>Start <input type="date" id="start-date"></label>
+      <label>End <input type="date" id="end-date"></label>
+
+      <h2>Variable (chart)</h2>
+      <select id="variable-select"></select>
+
+      <button id="load-btn">Reload</button>
+
+      <div id="info"></div>
+    </aside>
+    <section id="content">
+      <div id="map"></div>
+      <div id="bottom">
+        <div id="chart-wrap"><canvas id="chart"></canvas></div>
+        <div id="table-wrap">
+          <table id="data-table" class="display compact" style="width:100%"></table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.datatables.net/2.1.6/js/dataTables.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
