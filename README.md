@@ -35,6 +35,44 @@ Actions. Processed data is stored in AWS S3 as partitioned Parquet files for eff
 5. **Automation**
     - The entire process is orchestrated via GitHub Actions, enabling scheduled and reproducible data archiving.
 
+## Web Explorer
+
+A static map-based explorer lives in [`docs/`](docs/). It is built to be served
+by GitHub Pages (Settings → Pages → branch `main`, folder `/docs`) and uses:
+
+-   **MapLibre GL** for the station map
+-   **DuckDB-WASM** to read the partitioned Parquet directly from S3 over HTTPS
+-   **DataTables** for the tabular view, **Chart.js** for the time-series
+
+It reads `docs/manifest.json` — a list of stations and the dates we have data
+for — which is regenerated at the end of every nightly action run from the
+S3 listing joined with the [Montana Mesonet station API](https://mesonet.climate.umt.edu/api/v2/stations/?type=json).
+
+### Public read access (required for the explorer)
+
+The explorer talks to S3 directly from the browser, so the `air-quality/`
+prefix needs to allow anonymous `GetObject`. Listing stays private. Apply
+this bucket policy on `mco-mesonet`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "PublicReadAirQuality",
+    "Effect": "Allow",
+    "Principal": "*",
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::mco-mesonet/air-quality/*"
+  }]
+}
+```
+
+CORS on the bucket is already configured (`Allow-Origin: *`, methods `GET, HEAD`).
+Until this policy is applied the explorer's status bar will show a clear
+"S3 returned 403" message — the page itself still loads.
+
+---
+
 ## S3 Data Archive and Partitioning
 
 All processed air quality data are archived in the following AWS S3 bucket:
