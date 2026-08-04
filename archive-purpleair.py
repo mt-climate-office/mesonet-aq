@@ -156,40 +156,28 @@ def upload_to_s3(df, s3_bucket, base_prefix, s3fs_filesystem, partition_cols=["s
         print(f"✅ Wrote {s3_file_path}")
 
 def load_parquet_manifest(bucket: str, prefix: str) -> set[tuple[str, str]]:
-    import requests
+    """List existing (station, date) partitions with the job's own credentials.
+
+    Used to do an ANONYMOUS https listing of the bucket. That stopped working
+    2026-08-04 when mco-mesonet's public-access block was restored (the bucket
+    is now served exclusively through the data CDN,
+    https://data2.climate.umt.edu/mesonet/air-quality/). This job already
+    authenticates to WRITE, so it lists the same way.
+    """
     import re
-    from xml.etree import ElementTree
 
-    def get_namespace(element):
-        m = re.match(r"\{(.*)\}", element.tag)
-        return m.group(1) if m else ""
-
-    url = f"https://{bucket}.s3.amazonaws.com"
-    params = {"list-type": "2", "prefix": prefix}
+    # (despite the name, this helper returns a boto3 S3 *client*)
+    s3 = boto3_session_with_github_actions()
     partitions = set()
-
-    while True:
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        root = ElementTree.fromstring(r.content)
-
-        ns_uri = get_namespace(root)
-        ns = {"ns": ns_uri} if ns_uri else {}
-
-        for contents in root.findall(".//ns:Contents", namespaces=ns):
-            key = contents.find("ns:Key", namespaces=ns).text
-            #print("🔍", key)
+    for page in s3.get_paginator("list_objects_v2").paginate(
+        Bucket=bucket, Prefix=prefix
+    ):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
             if key.endswith(".parquet"):
                 match = re.search(r"station=(.+?)/date=(\d{4}-\d{2}-\d{2})/", key)
                 if match:
                     partitions.add((match.group(1), match.group(2)))
-
-        token = root.find(".//ns:NextContinuationToken", namespaces=ns)
-        if token is not None:
-            params["continuation-token"] = token.text
-        else:
-            break
-
     return partitions
     
 def main():
