@@ -1,0 +1,49 @@
+# Build the pipeline image and push :latest + :<sha> to ECR. The next
+# scheduled run picks up :latest; no terraform needed for a code release.
+# Auth is OIDC only: AWS_ROLE_ARN is a repo Actions VARIABLE, from the
+# terraform output github_actions_role_arn.
+name: build-push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - pyproject.toml
+      - uv.lock
+      - src/**
+      - .github/workflows/build-push.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: build-push
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: mesonet-aq
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+      - name: Build and push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY"
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+            --output=type=image,oci-mediatypes=false,push=true \
+            -t "$IMAGE:latest" -t "$IMAGE:${GITHUB_SHA}" .
