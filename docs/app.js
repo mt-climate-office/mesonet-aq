@@ -304,6 +304,11 @@
 
   /* ── Detail sheet ──────────────────────────────────────────────────────── */
 
+  // .mco-sheet docks at top: var(--chrome-h). Core publishes that only for a
+  // sticky navbar, so an in-flow bar must publish it here; at 0 the sheet's
+  // head (title and ×) sat under the navbar and could not be reached.
+  MCO.metrics.observe('--chrome-h', $('navbar'));
+
   const sheet = MCO.initSheet({
     sheet: sheetEl,
     peekHeight: 'auto',
@@ -363,10 +368,60 @@
     renderMap();
     if (url === 'auto' && !(history.state && history.state.mcoDetail)) writeUrl({ push: true });
     else if (url !== 'none') writeUrl();
-    if (fly && map && s.lat != null) {
-      map.flyTo({ center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), 7), animate: !MCO.reducedMotion() });
+    if (map && s.lat != null) {
+      // Wait out the sheet's slide-in (0.22 s) so it is measured where it
+      // rests; a compact sheet is still growing to its peek height before then.
+      const settle = wasOpen || MCO.reducedMotion() ? 0 : 240;
+      setTimeout(() => {
+        if (state.station !== id) return;
+        if (!fly) { revealStation(s); return; }
+        // Land the station in the middle of the map area the sheet leaves visible.
+        map.once('moveend', () => revealStation(s));
+        map.flyTo({
+          center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), 7),
+          offset: sheetOffset(), animate: !MCO.reducedMotion(),
+        });
+      }, settle);
     }
     drawChart();
+  }
+
+  // The map runs full-bleed under the sheet: docked right on desktop, bottom
+  // on compact. offsetLeft/Top ignore the slide-in transform.
+  function sheetRect() {
+    const w = sheetEl.offsetWidth, h = sheetEl.offsetHeight;
+    if (sheetEl.hidden || !w || !h) return null;
+    const left = sheetEl.offsetLeft, top = sheetEl.offsetTop;
+    return { left, top, right: left + w, bottom: top + h, width: w, height: h };
+  }
+
+  // flyTo offset that centres the target in the uncovered part of the map.
+  function sheetOffset() {
+    const p = sheetRect();
+    if (!p) return [0, 0];
+    return MCO.viewport.isCompact() ? [0, -p.height / 2] : [-p.width / 2, 0];
+  }
+
+  // Pan the minimum needed to get the selected dot out from under the sheet,
+  // and only if it is under it, so picking a visible dot never moves the map
+  // (mesonet-explorer's revealSelectedDot). panBy moves the CAMERA, so content
+  // moves by (-dx, -dy): to push the dot left of a right-docked sheet, dx > 0.
+  const REVEAL_MARGIN_PX = 44;
+  function revealStation(s) {
+    if (!map || sheet.state() === 'closed' || state.station !== s.id) return;
+    const p = sheetRect();
+    if (!p) return;
+    const c = map.getContainer().getBoundingClientRect();
+    const pt = map.project([s.lon, s.lat]);
+    const x = c.left + pt.x, y = c.top + pt.y;
+    const M = REVEAL_MARGIN_PX;
+    const near = x > p.left - M && x < p.right + M && y > p.top - M && y < p.bottom + M;
+    if (!near) return;
+    const compact = MCO.viewport.isCompact();
+    const dx = compact ? 0 : x - (p.left - M);
+    const dy = compact ? y - (p.top - M) : 0;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    map.panBy([dx, dy], { animate: !MCO.reducedMotion(), duration: 260 });
   }
 
   function onSheetClosed() {
