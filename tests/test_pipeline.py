@@ -64,6 +64,7 @@ def test_run_spans_months_and_resumes(settings, store, monkeypatch):
 
     latest = json.loads(store.get("air-quality/latest/latest.json"))
     assert latest["stations"][0]["aqi_category"] == "Good"
+    assert isinstance(latest["stations"][0]["aqi"], int)
 
 
 def test_run_stops_station_at_first_failure(settings, store, monkeypatch):

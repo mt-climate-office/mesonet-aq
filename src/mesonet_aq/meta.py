@@ -147,7 +147,8 @@ def latest_rows(arc: Archive, stations: list[dict], now: datetime) -> list[dict]
                 if not with_aqi.empty
                 else None,
                 "pm2.5_nowcast": _clean(best["pm2.5_nowcast"]),
-                "aqi": _clean(best["aqi"]),
+                # int16-with-nulls reads back as float; publish an integer.
+                "aqi": None if _clean(best["aqi"]) is None else int(best["aqi"]),
                 "aqi_category": _clean(best["aqi_category"]),
                 "temperature": _clean(last["temperature"]),
                 "humidity": _clean(last["humidity"]),
