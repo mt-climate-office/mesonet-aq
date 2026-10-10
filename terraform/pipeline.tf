@@ -41,11 +41,12 @@ module "pipeline" {
 
   task_policy_statements = [
     {
-      # Put-overwrite of station-months and index files. Delete is for the
-      # post-cutover legacy-tree retirement only; the bucket is versioned and
-      # the mco-aws lifecycle expires air-quality/ noncurrent versions at 30 d.
+      # Put-overwrite of station-months and index files only. s3:DeleteObject
+      # is added back, in its own change, when the legacy station=/date= tree
+      # is retired (needs Kyle's go-ahead). The bucket is versioned and the
+      # mco-aws lifecycle expires air-quality/ noncurrent versions at 30 d.
       sid       = "AirQualityWrite"
-      actions   = ["s3:PutObject", "s3:DeleteObject"]
+      actions   = ["s3:PutObject"]
       resources = ["${data.aws_s3_bucket.mesonet.arn}/${local.prefix}/*"]
     },
     {
