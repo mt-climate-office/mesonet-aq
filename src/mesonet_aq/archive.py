@@ -48,8 +48,13 @@ class Archive:
     def put_json(
         self, rel: str, obj, cache_control: str, content_type: str = layout.JSON
     ) -> None:
+        # allow_nan=False: bare NaN is not JSON, and browsers reject the whole
+        # file. Fail the run before publishing rather than ship it.
         body = (
-            json.dumps(obj, indent=None, separators=(",", ":"), default=str) + "\n"
+            json.dumps(
+                obj, indent=None, separators=(",", ":"), default=str, allow_nan=False
+            )
+            + "\n"
         ).encode()
         self.put(rel, body, content_type, cache_control)
 
