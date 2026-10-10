@@ -1,0 +1,23 @@
+# gitleaks configuration.
+#
+# Allowlists COMMITS, never values, and only these two. If a finding appears
+# anywhere else, it is real until proven otherwise -- do not widen this.
+#
+# Both are the rule `airtable-api-key` matching the Airtable BASE ID in the
+# retired archive-purpleair.py (`AIRTABLE_BASE_ID = "app..."`). A base ID
+# names a base; it authenticates nothing (the token is AIRTABLE_TOKEN, which
+# has only ever lived in GitHub secrets / Secrets Manager). Verified
+# 2026-10-10 from the report METADATA only. The base ID now comes from the
+# environment (terraform/pipeline.tf), so new code cannot trip the rule.
+#
+# Re-verify with: gitleaks git --no-banner --redact --report-format json --report-path /tmp/l.json .
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Airtable base ID (not a credential) in the retired archive-purpleair.py"
+commits = [
+  "a0045d3f2994c0238f16cf7d786502afaa9cd71c",
+  "2e2d93b839c39068dddfddb3e8b6ad7961d45a66",
+]

@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (gitignored). Placeholders only in this file.
+
+# gh api repos/mt-climate-office/mesonet-aq --jq .id
+github_repository_id = "000000000"
+
+# Airtable base holding the Deployments table (from its URL; an identifier,
+# not a credential -- kept out of git only because secret scanners flag it).
+airtable_base_id = "<base id>"
+
+# Shared VPC PrivateSubnet1/2 and its default SG (same as mesonet-alerts'
+# ecs_subnet_ids / ecs_security_group_ids):
+#   aws ec2 describe-subnets --filters Name=tag:Name,Values='*Private*'
+subnet_ids         = ["subnet-00000000000000000", "subnet-00000000000000000"]
+security_group_ids = ["sg-00000000000000000"]
+

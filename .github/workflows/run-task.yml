@@ -1,0 +1,73 @@
+# Start the pipeline task by hand: the one-shot migration, a backfill/repair
+# (`run --since`), or a derived-product rebuild. Same image and task definition
+# as the nightly schedule. Waits for the task and fails if it exits non-zero.
+#
+# Repo Actions variables (from terraform outputs): AWS_ROLE_ARN, ECS_CLUSTER,
+# ECS_TASK_FAMILY, ECS_NETWORK.
+name: run-task
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Pipeline command"
+        type: choice
+        options: [run, migrate, rebuild-derived]
+        default: run
+      since:
+        description: "run only: re-fetch from this UTC date (YYYY-MM-DD)"
+        required: false
+      station:
+        description: "run/migrate only: limit to one station id"
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: pipeline-task
+  cancel-in-progress: false
+
+jobs:
+  run-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+          role-duration-seconds: 3600
+      - name: Start and wait
+        env:
+          COMMAND: ${{ inputs.command }}
+          SINCE: ${{ inputs.since }}
+          STATION: ${{ inputs.station }}
+          CLUSTER: ${{ vars.ECS_CLUSTER }}
+          FAMILY: ${{ vars.ECS_TASK_FAMILY }}
+          NETWORK: ${{ vars.ECS_NETWORK }}
+        run: |
+          set -euo pipefail
+          # Inputs are validated, then passed as a JSON array -- never spliced into a shell string.
+          args=("$COMMAND")
+          if [[ -n "$SINCE" ]]; then
+            [[ "$SINCE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "bad date"; exit 1; }
+            args+=(--since "$SINCE")
+          fi
+          if [[ -n "$STATION" ]]; then
+            [[ "$STATION" =~ ^[a-z0-9]+$ ]] || { echo "bad station"; exit 1; }
+            args+=(--station "$STATION")
+          fi
+          cmd=$(jq -cn '$ARGS.positional' --args "${args[@]}")
+          overrides=$(jq -cn --arg name "$FAMILY" --argjson cmd "$cmd" \
+            '{containerOverrides:[{name:$name,command:$cmd}]}')
+          task=$(aws ecs run-task --cluster "$CLUSTER" --task-definition "$FAMILY" \
+            --launch-type FARGATE --network-configuration "$NETWORK" \
+            --overrides "$overrides" --query 'tasks[0].taskArn' --output text)
+          echo "task: $task  command: $cmd"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$task" || true
+          while [[ "$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task" --query 'tasks[0].lastStatus' --output text)" != STOPPED ]]; do sleep 30; done
+          code=$(aws ecs describe-tasks --cluster "$CLUSTER" --tasks "$task" --query 'tasks[0].containers[0].exitCode' --output text)
+          echo "exit code: $code (logs: CloudWatch /ecs/$FAMILY)"
+          [[ "$code" == 0 ]]

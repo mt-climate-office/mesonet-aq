@@ -1,1 +1,14 @@
 .DS_Store
+.Rhistory
+.env
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Terraform: lockfile is committed, state and tfvars are not.
+terraform/.terraform/
+terraform/terraform.tfvars
+terraform/*.tfplan
+terraform/tfplan

@@ -1,39 +1,33 @@
-library(arrow)
-library(tidyverse)
+# Read the Montana Mesonet PurpleAir archive from the MCO data CDN.
+#
+# The bucket is private; everything is served over HTTPS from
+# https://data2.climate.umt.edu/mesonet/air-quality/. HTTPS has no directory
+# listing, so file lists come from manifest.json. Every file has the same
+# fixed schema, so multi-file reads need no type fixes.
 
-## Some of the sensors produce missing data, which screws up parquet reads.
-## This function reads everything then casts problematic columns as strings.
+library(jsonlite)
+library(duckdb) # DuckDB >= 1.1; httpfs autoloads for https:// paths
 
-# Step 1: Open the dataset
-ds <- 
-  open_dataset("s3://mco-mesonet/air-quality")
+base <- "https://data2.climate.umt.edu/mesonet/air-quality"
+manifest <- fromJSON(file.path(base, "manifest.json"))
 
-# Step 2: Inspect column types
-types <- 
-  ds$schema$fields 
-names(types) <- purrr::map_chr(types, ~ .x$name)
+con <- dbConnect(duckdb())
 
-# Step 3: Identify fields with null or problematic types
-# This is a simplified heuristic: you may need to inspect actual files for full accuracy
-problematic_fields <- 
-  names(types)[map_lgl(types, ~ inherits(.x$type, "Null"))]
-
-# Step 4: Build a schema that sets only problematic fields to string
-custom_schema <- schema(!!!set_names(
-  map(names(types), 
-      function(name) {
-    if (name %in% problematic_fields) string() else types[[name]]$type
-  }),
-  names(types)
+# ── Hourly summaries (EPA-corrected PM2.5, NowCast, AQI): one file per station-year
+hourly_urls <- with(manifest$files$hourly, file.path(base, path[station == "acebirne"]))
+hourly <- dbGetQuery(con, sprintf(
+  "SELECT * FROM read_parquet([%s]) ORDER BY time_stamp",
+  paste0("'", hourly_urls, "'", collapse = ", ")
 ))
 
-# Step 5: Re-open with custom schema
-ds_fixed <- 
-  open_dataset("s3://mco-mesonet/air-quality", schema = custom_schema)
+# ── Raw ~2-minute A/B readings: one file per station-month
+raw_files <- subset(manifest$files$raw, station == "acebirne" & year == 2025 & month == 9)
+raw <- dbGetQuery(con, sprintf(
+  "SELECT * FROM read_parquet([%s]) WHERE time_stamp >= '2025-09-07' AND time_stamp < '2025-09-08'",
+  paste0("'", file.path(base, raw_files$path), "'", collapse = ", ")
+))
 
-# Now, you can query server side and then collect
-ds_fixed |>
-  filter(station == "mcolubre",
-         time_stamp >= lubridate::as_datetime("2025-10-07"),
-         time_stamp < lubridate::as_datetime("2025-10-08")) |>
-  collect()
+# Latest reading + NowCast AQI for every station
+latest <- fromJSON(file.path(base, "latest/latest.json"))$stations
+
+dbDisconnect(con, shutdown = TRUE)
