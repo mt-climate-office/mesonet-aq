@@ -2,14 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Montana Mesonet — Air Quality Explorer</title>
-  <!-- MapLibre GL 6.11.2 (GHSA-jrc7-96c5-q579: <= 6.4.0 has an attribution-string XSS).
-       6.x is ES-modules only: app.js imports it. import() takes no integrity
-       attribute, so the SRI hashes live in this import map, which the browser
-       applies to the entry and its shared chunk. Copied byte for byte from
-       mco-web-style snippets/head.html (v0.12.0) so its CSP sha256 matches the
-       kit's. Keep it ONE line and ahead of every module script. -->
+  <!-- CSP (meta form; GitHub Pages can't set headers).
+       script-src: the first sha256 is THIS page's anti-flash script (recompute
+       on any edit: mco-web-style MIGRATING.md § Gotchas); the second is the
+       one-line MapLibre import map, identical on every kit page. 'self' covers
+       app.js and the vendored Parquet reader (vendor/, scripts/vendor.sh);
+       jsDelivr serves the kit and ECharts, both SRI-pinned.
+       worker-src: MapLibre 6 starts its worker from blob: and imports its
+       chunk from unpkg. connect-src: data2 is the data CDN (manifest, latest,
+       Parquet range reads); s3.amazonaws.com is the kit's hillshade tiles. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'none';
+    script-src 'self' 'sha256-v3il6Uh82ESNrvf3ERc536SXE1pi2Le5vlV0TpFWJyU=' 'sha256-NgHBdw+Nl6S2kTHNyvv5uFwHfytmfDJR39Y9qVPt/UI=' https://unpkg.com https://cdn.jsdelivr.net;
+    worker-src blob: https://unpkg.com;
+    style-src 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net;
+    font-src https://cdn.jsdelivr.net;
+    img-src 'self' data: blob: https://cdn.jsdelivr.net;
+    connect-src 'self' https://data2.climate.umt.edu https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com https://s3.amazonaws.com;
+    base-uri 'none';
+    form-action 'none'">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Air Quality · MT Mesonet</title>
+  <meta name="description" content="Air quality at Montana Mesonet stations: EPA-corrected PurpleAir PM2.5, NowCast AQI, and the full sensor archive, by the Montana Climate Office.">
+  <meta name="author" content="Montana Climate Office">
+  <meta name="theme-color" content="#1a6faf" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#161b22" media="(prefers-color-scheme: dark)">
+  <!-- Canonical on the production host (mesonet-gateway proxies /air here). -->
+  <link rel="canonical" href="https://mesonet.climate.umt.edu/air/">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/assets/apple-touch-icon.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Montana Mesonet">
+  <meta property="og:title" content="Air Quality · Montana Mesonet">
+  <meta property="og:description" content="EPA-corrected PurpleAir PM2.5 and NowCast AQI at Montana Mesonet stations, with the full sensor archive.">
+  <meta property="og:url" content="https://mesonet.climate.umt.edu/air/">
+  <meta property="og:image" content="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Montana Climate Office">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Air Quality · Montana Mesonet">
+  <meta name="twitter:description" content="EPA-corrected PurpleAir PM2.5 and NowCast AQI at Montana Mesonet stations, with the full sensor archive.">
+  <meta name="twitter:image" content="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Montana Climate Office">
+
+  <!-- Anti-flash theme boot: mco-web-style 0.13.1 snippets/anti-flash.html, byte for byte. -->
+  <script>
+    (function () {
+      const raw = new URLSearchParams(location.search).get('theme');
+      const url = raw == null ? null : raw.toLowerCase();
+      let saved = null;
+      try { saved = localStorage.getItem('mco-theme'); } catch (e) {}
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const valid = ['dark', 'light', 'high-contrast'];
+      const t = valid.includes(url) ? url
+              : valid.includes(saved) ? saved
+              : (prefersDark ? 'dark' : 'light');
+      const root = document.documentElement;
+      root.setAttribute('data-theme', t);
+      root.classList.toggle('is-compact', window.matchMedia('(max-width: 640px), (max-height: 560px)').matches);
+      root.classList.toggle('is-touch', window.matchMedia('(hover: none)').matches);
+      // First-paint hold (0.9.0): [data-hold] stays invisible until MCO.ready();
+      // this timeout releases it anyway, so a failed script never strands a page.
+      root.classList.add('mco-booting');
+      setTimeout(function () { root.classList.remove('mco-booting'); }, 3000);
+    })();
+  </script>
+
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/fonts/outfit-latin.woff2"
+        as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/fonts/space-mono-latin.woff2"
+        as="font" type="font/woff2" crossorigin>
+
   <script type="importmap">{"integrity":{"https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs":"sha384-KQzExYlfg1SnYNpLaXHTnaCTjr5wmiZ6X3sasvPb94caZfH+3+T1Sl4eJziXUtmN","https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl-shared.mjs":"sha384-V59ofCEPEqpSk5Mswc19DtDYbZWJtne210dFzS328Il6O31eLwTV7v57+Z3NjW/7"}}</script>
   <link rel="modulepreload" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs"
         integrity="sha384-KQzExYlfg1SnYNpLaXHTnaCTjr5wmiZ6X3sasvPb94caZfH+3+T1Sl4eJziXUtmN"
@@ -20,43 +88,219 @@
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css"
         integrity="sha384-ntw3zEt6rcVML7jDK0ULmHa5hxLB23afsPqzqfY+gLgMfAkbFCnCgPpkZvV5mmZX"
         crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdn.datatables.net/2.1.6/css/dataTables.dataTables.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/theme/mco-theme.css"
+        integrity="sha384-s6MS3mtowaDBNrYl8BzVKW+tkporVrIEixS7kjvHZ67k4syUXk0rKKMCHO2pNjNu"
+        crossorigin="anonymous">
+
+  <style>
+    /* App-specific styles ONLY. Chrome, tokens and component shells come from
+       the kit; no raw hexes except the EPA AQI role colors in app.js
+       (kit-override, documented there). */
+    body { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    main { flex: 1; min-height: 0; position: relative; }
+    main:focus { outline: none; }
+    #map { width: 100%; height: 100%; }
+
+    .station-select {
+      min-height: 34px; max-width: 240px; padding: 4px 8px;
+      background: var(--input-bg); color: var(--text-primary);
+      border: 1px solid var(--ctrl-border); border-radius: var(--radius-md);
+      font-family: inherit; font-size: 0.78rem;
+    }
+    @media (hover: none) { .station-select { height: 40px; } }
+
+    /* Legend: AQI categories, bottom-left (the sheet owns the right edge). */
+    #legend-panel { left: 0.75rem; bottom: 1.75rem; }
+    .legend-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--text-secondary); padding: 2px 0; }
+    .legend-swatch { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 1.5px solid var(--dot-stroke); background: var(--swatch, transparent); }
+    .legend-range { margin-left: auto; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-muted); }
+    .legend-note { font-size: 0.7rem; color: var(--text-muted); margin: 0.4rem 0 0; max-width: 15rem; }
+
+    /* Detail sheet: wide enough for a chart on desktop. */
+    #sheet { --sheet-w: 560px; }
+    .aqi-now { display: flex; align-items: center; gap: 0.75rem; padding: 0.25rem 0 0.75rem; }
+    .aqi-badge {
+      min-width: 3.4rem; padding: 0.35rem 0.5rem; border-radius: var(--radius-md);
+      text-align: center; font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700;
+      background: var(--aqi-bg, var(--bg-raised)); color: var(--aqi-fg, var(--text-primary));
+      border: 1px solid var(--border);
+    }
+    .aqi-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .aqi-cat { font-weight: var(--fw-semibold); color: var(--text-primary); }
+    .aqi-when { font-size: 0.75rem; color: var(--text-secondary); }
+    .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.5rem; margin: 0 0 0.75rem; }
+    .facts div { background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.35rem 0.5rem; }
+    .facts dt { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+    .facts dd { margin: 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary); }
+    .chart-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.25rem 0 0.5rem; }
+    .chart-controls select { min-height: 34px; padding: 4px 8px; background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--ctrl-border); border-radius: var(--radius-md); font: inherit; font-size: 0.8rem; }
+    @media (hover: none) { .chart-controls select { height: 40px; } }
+    /* Short labels ("7 d") fall under the 40px touch minimum (§5.5). */
+    #range-seg .seg-btn { min-width: 44px; justify-content: center; }
+    #chart { width: 100%; height: 300px; position: relative; }
+    .chart-status { font-size: 0.75rem; color: var(--text-secondary); min-height: 1.2em; margin: 0.25rem 0; }
+    .sheet-section { margin-top: 1rem; }
+    .sheet-section h3 { font-size: var(--fs-sm, 0.85rem); margin: 0 0 0.4rem; color: var(--text-primary); }
+    .sheet-section p, .sheet-section li { font-size: 0.8rem; color: var(--text-secondary); }
+    .sheet-section ul { padding-left: 1.1rem; margin: 0.25rem 0; }
+    .sheet-section a { color: var(--accent-line); }
+    .dl-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .basis-note { font-size: 0.72rem; color: var(--text-secondary); margin: 0.25rem 0 0; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>Montana Mesonet — Air Quality Explorer</h1>
-    <div id="status" class="status">Initializing…</div>
-  </header>
-  <main>
-    <aside id="sidebar">
-      <h2>Station</h2>
-      <select id="station-select"></select>
 
-      <h2>Date range</h2>
-      <label>Start <input type="date" id="start-date"></label>
-      <label>End <input type="date" id="end-date"></label>
+<a class="mco-skip-link" href="#main">Skip to map</a>
 
-      <h2>Variable (chart)</h2>
-      <select id="variable-select"></select>
+<header id="navbar" class="mco-navbar">
+  <a href="https://climate.umt.edu" target="_blank" rel="noopener noreferrer"
+     class="logo-link" aria-label="Montana Climate Office">
+    <img class="logo-img" src="assets/mco-logo.png" alt="" width="40" height="40">
+  </a>
+  <div class="nav-divider" aria-hidden="true"></div>
+  <div class="brand">
+    <h1 class="brand-title">Mesonet Air Quality</h1>
+    <span class="brand-subtitle">A service of the Montana Climate Office</span>
+  </div>
 
-      <button id="load-btn">Reload</button>
+  <div class="controls">
+    <label class="sr-only" for="station-select">Open a station</label>
+    <select id="station-select" class="station-select">
+      <option value="">Open a station…</option>
+    </select>
+  </div>
 
-      <div id="info"></div>
-    </aside>
-    <section id="content">
-      <div id="map"></div>
-      <div id="bottom">
-        <div id="chart-wrap"><canvas id="chart"></canvas></div>
-        <div id="table-wrap">
-          <table id="data-table" class="display compact" style="width:100%"></table>
+  <div class="nav-meta">
+    <span class="refresh-status static" id="data-status"><span class="dot" aria-hidden="true"></span><span id="data-stamp">loading…</span></span>
+    <button type="button" class="nav-btn" id="btn-share" aria-label="Copy a link to this view">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/></svg>
+      <span class="btn-label">Share</span>
+    </button>
+    <button type="button" class="nav-btn icon-only" id="btn-theme" aria-label="Switch theme">
+      <svg id="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg id="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+    <button type="button" class="nav-btn mco-btn-info" id="btn-info" aria-label="About this map">?</button>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <div id="map" role="application" aria-label="Map of Montana Mesonet air quality sensors, colored by NowCast AQI. The data is in the table that follows."></div>
+
+  <div class="mco-panel" id="legend-panel">
+    <div class="mco-panel-head">
+      <span class="mco-panel-title">NowCast AQI</span>
+      <button type="button" class="mco-panel-toggle" id="legend-toggle"
+              aria-controls="legend-body" aria-label="Collapse legend">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+      </button>
+    </div>
+    <div class="mco-panel-body" id="legend-body">
+      <!-- Rows are built by app.js from the one AQI role table. -->
+      <div id="legend-rows"></div>
+      <p class="legend-note">Numbers on the map are the AQI. Data are published nightly through the end of the previous day (UTC).</p>
+    </div>
+  </div>
+</main>
+
+<section class="mco-sheet" id="sheet" aria-labelledby="sheet-title" data-state="closed" hidden>
+  <div class="mco-sheet-head">
+    <button type="button" class="mco-sheet-grip" aria-label="Expand details" aria-expanded="false"></button>
+    <h2 class="mco-sheet-title" id="sheet-title" tabindex="-1">Station</h2>
+    <button type="button" class="modal-close" data-close-sheet aria-label="Close station details">×</button>
+  </div>
+  <div class="mco-sheet-body">
+    <div data-peek>
+      <div class="aqi-now">
+        <div class="aqi-badge" id="aqi-badge">–</div>
+        <div class="aqi-text">
+          <span class="aqi-cat" id="aqi-cat">No recent data</span>
+          <span class="aqi-when" id="aqi-when"></span>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+    <dl class="facts" id="facts"></dl>
 
-  <script src="https://cdn.datatables.net/2.1.6/js/dataTables.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script type="module" src="app.js"></script>
+    <div class="chart-controls">
+      <label class="sr-only" for="var-select">Variable</label>
+      <select id="var-select"></select>
+      <div class="seg-btns" id="range-seg" role="group" aria-label="Time range"></div>
+      <label class="sr-only" for="res-select">Resolution</label>
+      <select id="res-select">
+        <option value="hourly">Hourly</option>
+        <option value="raw">2-minute</option>
+      </select>
+    </div>
+    <div id="chart" role="img" aria-label="Time series chart. The data is in the table that follows."></div>
+    <p class="chart-status" id="chart-status" aria-live="off"></p>
+    <p class="basis-note" id="basis-note" hidden>Some hours were corrected from the <code>atm</code> channels (data before October 2026), which read low in heavy smoke.</p>
+    <div id="chart-twin"></div>
+
+    <div class="sheet-section">
+      <h3>Download</h3>
+      <div class="dl-row">
+        <button type="button" class="nav-btn" id="btn-csv">CSV of this chart</button>
+      </div>
+      <ul id="file-links"></ul>
+    </div>
+  </div>
+</section>
+
+<section id="sr-twin" aria-label="Station air quality"></section>
+
+<div class="mco-tooltip" id="tooltip" aria-hidden="true"></div>
+
+<dialog class="mco-modal" id="info-modal" aria-labelledby="info-modal-title">
+  <div class="info-modal-box">
+    <div class="info-modal-header">
+      <div>
+        <h2 class="info-modal-title" id="info-modal-title">Mesonet Air Quality</h2>
+        <p class="info-modal-subtitle">PurpleAir sensors at Montana Mesonet stations</p>
+      </div>
+      <button type="button" class="modal-close" data-close-modal aria-label="Close">×</button>
+    </div>
+    <div class="info-section">
+      <h3>What this shows</h3>
+      <p>Low-cost PurpleAir PA-II sensors at Montana Mesonet stations. Each dot shows the latest hourly
+         <strong>NowCast AQI</strong> for fine particulate matter (PM2.5), using the EPA's May 2024 breakpoints.
+         The number on the dot is the AQI, so the colors are never the only cue.</p>
+      <p>Data are published <strong>nightly</strong>, through the end of the previous day (UTC). This is not a
+         real-time smoke alert. For current conditions, see <a href="https://fire.airnow.gov/" target="_blank" rel="noopener noreferrer">AirNow Fire and Smoke Map</a>.</p>
+    </div>
+    <div class="info-section">
+      <h3>How to use it</h3>
+      <ul>
+        <li>Click a dot, or use <strong>Open a station</strong>, for its chart and downloads.</li>
+        <li>Choose a variable and a time range. Ranges up to 7 days can show the raw 2-minute A/B channels.</li>
+        <li>Keyboard: the station picker, and the station table that follows the map, reach every sensor.</li>
+      </ul>
+    </div>
+    <div class="info-section">
+      <h3>Share or bookmark</h3>
+      <p>The address bar always holds the current view: station, variable, range, map position and theme.
+         Share copies it. This map has no single-key shortcuts, so <code>?kbd=off</code> has nothing to turn off.</p>
+    </div>
+    <div class="info-section">
+      <h3>Data</h3>
+      <p>PM2.5 is corrected with the EPA US-wide correction (Barkjohn et al. 2021, with the 2023 smoke extension).
+         Hours where the two laser channels disagree are screened out. These are corrected low-cost sensor data, not
+         regulatory measurements. The full archive is open at
+         <a href="https://data2.climate.umt.edu/mesonet/air-quality/README.md" target="_blank" rel="noopener noreferrer">data2.climate.umt.edu/mesonet/air-quality</a>.
+         Source: <a href="https://github.com/mt-climate-office/mesonet-aq" target="_blank" rel="noopener noreferrer">mesonet-aq</a>.</p>
+      <p id="credit"></p>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/core/mco-core.js"
+        integrity="sha384-0SiGncfP37X1rYs83vpTsUgtsQMruIVGkbWHdrWeF8fIr7IWYHM/+NSR/PDLIDhJ"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/palette/mco-palette.js"
+        integrity="sha384-nmQlqM0DO86ApUoiACDt0cl/bUjemVhSUytRow9vdP1ydxnXGamD81mumft3n41L"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/gh/mt-climate-office/mco-web-style@0.13.1/map/mco-map.js"
+        integrity="sha384-tmDqtqi4yYiDHOxkZikwzXF3Lpkb63b0Tu6K7jeCpU9gJkPB2GbpFHLasGHka6zP"
+        crossorigin="anonymous"></script>
+<script src="app.js"></script>
 </body>
 </html>
