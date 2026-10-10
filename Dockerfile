@@ -1,6 +1,6 @@
 # mesonet-aq nightly pipeline: ECS Fargate one-shot (terraform/pipeline.tf).
 # Dependencies are installed from uv.lock, so the image matches CI exactly.
-FROM ghcr.io/astral-sh/uv:0.9.25 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.0 AS uv
 
 FROM python:3.12-slim AS build
 COPY --from=uv /uv /bin/uv
