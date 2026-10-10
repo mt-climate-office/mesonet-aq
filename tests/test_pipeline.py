@@ -2,12 +2,13 @@ import io
 import json
 from datetime import date
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from mesonet_aq import cdn, migrate, pipeline
+from mesonet_aq import cdn, meta, migrate, pipeline
 from mesonet_aq.layout import hourly_key, raw_key
 from mesonet_aq.schema import RAW_SCHEMA
 
@@ -65,6 +66,32 @@ def test_run_spans_months_and_resumes(settings, store, monkeypatch):
     latest = json.loads(store.get("air-quality/latest/latest.json"))
     assert latest["stations"][0]["aqi_category"] == "Good"
     assert isinstance(latest["stations"][0]["aqi"], int)
+
+
+def test_latest_json_is_strict_json_when_values_are_missing(
+    settings, store, monkeypatch
+):
+    # No humidity means no EPA correction: float32 NaN in the hourly table,
+    # which must publish as null, never as bare NaN (browsers reject the file).
+    def no_humidity(*a, **k):
+        return fake_day(*a, **k).drop(columns="humidity_a")
+
+    monkeypatch.setattr(pipeline, "fetch_day", no_humidity)
+    pipeline.run(settings, today=date(2026, 10, 3), store=store)
+
+    def reject(token):
+        raise ValueError(f"non-JSON constant {token}")
+
+    body = store.get("air-quality/latest/latest.json").decode()
+    row = json.loads(body, parse_constant=reject)["stations"][0]
+    assert row["pm2.5_epa"] is None and row["humidity"] is None
+
+
+def test_clean_maps_numpy_nan_to_none():
+    assert meta._clean(np.float32("nan")) is None
+    assert meta._clean(np.float64("nan")) is None
+    assert meta._clean(pd.NaT) is None
+    assert meta._clean(np.float32(1.5)) == 1.5
 
 
 def test_run_stops_station_at_first_failure(settings, store, monkeypatch):

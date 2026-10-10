@@ -50,12 +50,16 @@ def fetch_mesonet_stations() -> dict[str, dict]:
 
 
 def _clean(v):
-    if v is None or (isinstance(v, float) and math.isnan(v)) or v is pd.NA:
+    if v is None or v is pd.NA or v is pd.NaT:
         return None
     if isinstance(v, pd.Timestamp):
         return v.isoformat().replace("+00:00", "Z")
+    # Unwrap numpy scalars first: np.float32 is not a float subclass, so its
+    # NaN would slip past the check below and serialize as bare NaN.
     if hasattr(v, "item"):
-        return v.item()
+        v = v.item()
+    if isinstance(v, float) and math.isnan(v):
+        return None
     return v
 
 
