@@ -42,9 +42,31 @@ jobs:
           tar -xzf gitleaks.tar.gz gitleaks
           ./gitleaks git --no-banner --redact .
 
+  # Inline rather than mco-aws's reusable terraform-check.yml: this repo is
+  # PUBLIC and mco-aws is private, and GitHub refuses a public repo calling a
+  # private repo's reusable workflow (the run dies in 0 s as a "workflow file
+  # issue"). Same steps.
   terraform:
-    uses: mt-climate-office/mco-aws/.github/workflows/terraform-check.yml@v0.1.1
-    with:
-      working-directory: terraform
-    secrets:
-      MCO_AWS_READ_TOKEN: ${{ secrets.MCO_AWS_READ_TOKEN }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - run: terraform fmt -check -recursive
+      # Module sources live in private mco-aws: init needs the org read token.
+      # It is absent on fork PRs, so validate is skipped there rather than failing.
+      - name: init + validate
+        env:
+          MCO_AWS_READ_TOKEN: ${{ secrets.MCO_AWS_READ_TOKEN }}
+        run: |
+          if [ -z "$MCO_AWS_READ_TOKEN" ]; then
+            echo "::warning::MCO_AWS_READ_TOKEN not available; skipping terraform validate"
+            exit 0
+          fi
+          git config --global \
+            url."https://x-access-token:${MCO_AWS_READ_TOKEN}@github.com/mt-climate-office/mco-aws".insteadOf \
+            "https://github.com/mt-climate-office/mco-aws"
+          terraform init -backend=false -input=false
+          terraform validate
