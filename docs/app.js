@@ -103,10 +103,10 @@ function plotStations() {
       .setLngLat([s.lon, s.lat])
       .addTo(state.map)
       .setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setHTML(popupHtml));
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectStation(s.id);
-    });
+    // No stopPropagation: MapLibre opens a marker's popup from the *map*
+    // click that this element click bubbles into. (The app has no map click
+    // handler of its own, so letting it bubble clears nothing.)
+    el.addEventListener('click', () => selectStation(s.id));
     state.markers[s.id] = marker;
     bounds.extend([s.lon, s.lat]);
     any = true;
