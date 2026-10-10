@@ -2,6 +2,11 @@ import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0
 
 const MANIFEST_URL = './manifest.json';
 
+// MapLibre GL 6 is ESM-only (no UMD global). index.html's import map carries
+// the SRI hashes for this exact URL; main() imports it before building the map.
+const MAPLIBRE_URL = 'https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs';
+let maplibregl;
+
 const VARIABLES = [
   ['pm2.5_atm_a',             'PM2.5 µg/m³ (sensor A)'],
   ['pm2.5_atm_b',             'PM2.5 µg/m³ (sensor B)'],
@@ -92,10 +97,12 @@ function plotStations() {
       <div style="opacity:0.7">${escapeHtml(s.id)}</div>
       <div style="opacity:0.7;margin-top:0.25rem">${(s.dates || []).length} day(s) of data</div>
     `;
+    // addTo before setPopup: in MapLibre 6, addTo() drops the Enter/Space
+    // listener that setPopup() attached, so the popup lost keyboard access.
     const marker = new maplibregl.Marker({ element: el })
       .setLngLat([s.lon, s.lat])
-      .setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setHTML(popupHtml))
-      .addTo(state.map);
+      .addTo(state.map)
+      .setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }).setHTML(popupHtml));
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       selectStation(s.id);
@@ -289,9 +296,11 @@ function updateTable() {
   const cols = Object.keys(state.rows[0])
     .filter(k => k !== '_ts_ms')
     .map(k => ({
-      title: k,
+      // DataTables writes titles and 'display' renders as HTML, and these
+      // come from the parquet files: escape them.
+      title: escapeHtml(k),
       data: k,
-      render: (v) => formatCell(v),
+      render: (v, type) => (type === 'display' ? escapeHtml(formatCell(v)) : formatCell(v)),
     }));
 
   state.dataTable = new DataTable('#data-table', {
@@ -313,6 +322,7 @@ function formatCell(v) {
 }
 
 async function main() {
+  maplibregl = await import(MAPLIBRE_URL);
   initMap();
   populateVariableSelect();
 
