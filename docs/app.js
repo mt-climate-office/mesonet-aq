@@ -246,7 +246,9 @@
         id: 'stations-aqi', type: 'symbol', source: 'stations',
         filter: ['!', ['get', 'stale']],
         layout: {
-          'text-field': ['get', 'aqi'], 'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+          // CARTO stopped serving 'Open Sans Semibold' (404, 2026-10-22); this is
+          // the stack the kit's tribal labels and CARTO's own styles use.
+          'text-field': ['get', 'aqi'], 'text-font': ['Montserrat SemiBold', 'Open Sans Bold'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 4, 9, 10, 12],
           'text-allow-overlap': true, 'text-ignore-placement': true,
         },
