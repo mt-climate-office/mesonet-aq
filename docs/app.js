@@ -1,6 +1,6 @@
 /* ============================================================================
    Mesonet Air Quality · app.js
-   PurpleAir sensors at Montana Mesonet stations, on mco-web-style 0.13.1.
+   PurpleAir sensors at Montana Mesonet stations, on mco-web-style 0.16.2.
    Structure follows the kit exemplar (HOUSE-STYLE section refs as §).
 
    Data: the mesonet-aq archive on the MCO data CDN. manifest.json lists every
