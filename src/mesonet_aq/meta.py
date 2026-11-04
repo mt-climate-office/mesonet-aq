@@ -23,6 +23,26 @@ log = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
 STALE_AFTER = timedelta(hours=3)
 
+# Lineage, the same two keys in every data2/mesonet manifest. Additive: readers
+# that do not know them ignore them, so SCHEMA_VERSION is unchanged.
+TIER = "derived"
+BUILT_FROM = [
+    {
+        "name": "PurpleAir API",
+        "description": "Each station's PurpleAir PA-II sensor: un-averaged (~2-minute) "
+        "history from https://api.purpleair.com/v1/sensors/<sensor_index>/history",
+    },
+    {
+        "name": "Sensor deployments",
+        "description": "The Montana Climate Office's list of which PurpleAir sensor "
+        "is at which station, and since when (Airtable; not public)",
+    },
+    {
+        "name": "Montana Mesonet API",
+        "description": "Station names and locations, " + MESONET_STATIONS_API,
+    },
+]
+
 RAW_FILE = re.compile(
     r"raw/station=([^/]+)/year=(\d{4})/[^/]+_(\d{4})-(\d{2})\.parquet$"
 )
@@ -219,6 +239,8 @@ def publish_index(
         "schema_version": SCHEMA_VERSION,
         "generated_at": stamp,
         "base_url": public_base,
+        "tier": TIER,
+        "built_from": BUILT_FROM,
         "stations": stations,
         "files": idx,
     }
