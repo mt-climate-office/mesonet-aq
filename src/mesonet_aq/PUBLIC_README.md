@@ -13,6 +13,10 @@ PurpleAir PA-II sensors deployed at Montana Mesonet stations, archived nightly b
 Montana Climate Office. Source code: <https://github.com/mt-climate-office/mesonet-aq>.
 Explorer: <https://mesonet.climate.umt.edu/air/>.
 
+This folder is not covered by the Montana Mesonet data license (CC BY 4.0).
+The readings come from PurpleAir sensors, and PurpleAir's terms are still
+being reviewed.
+
 Base URL: `https://data2.climate.umt.edu/mesonet/air-quality/`
 
 HTTPS has no directory listing. Start from `manifest.json`, which lists every
