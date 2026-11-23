@@ -53,6 +53,13 @@ def test_run_spans_months_and_resumes(settings, store, monkeypatch):
     assert m["stations"][0]["fetched_through"] == "2026-10-02"
     assert m["stations"][0]["name"] == "Test Station"
     assert {f["month"] for f in m["files"]["raw"]} == {9, 10}
+    assert m["tier"] == "derived"
+    assert [s["name"] for s in m["built_from"]] == [
+        "PurpleAir API",
+        "Sensor deployments",
+        "Montana Mesonet API",
+    ]
+    assert all(set(s) == {"name", "description"} for s in m["built_from"])
 
     # Next night: re-fetch the trailing day, add the new one, no duplicates.
     calls.clear()

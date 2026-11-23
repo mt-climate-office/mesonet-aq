@@ -1,5 +1,14 @@
 # Montana Mesonet air quality (PurpleAir) archive
 
+| | |
+|---|---|
+| **Tier** | Derived product: PurpleAir sensor readings at Mesonet stations, organized into Parquet and corrected for analysis |
+| **Built from** | Each station's PurpleAir PA-II sensor, via the [PurpleAir API](https://api.purpleair.com/) history endpoint; the Montana Climate Office's sensor deployment list (not public); station names and locations from the [Mesonet API](https://mesonet.climate.umt.edu/api/v2/stations/) |
+| **Built by** | [mesonet-aq](https://github.com/mt-climate-office/mesonet-aq) (`src/mesonet_aq/pipeline.py`; this README and `manifest.json` by `src/mesonet_aq/meta.py`) |
+| **Updated** | Nightly at 01:30 Mountain time, through the end of the previous UTC day |
+| **Quality control** | None on `raw/`. In `hourly/`, `pm2.5_epa` (and the NowCast and AQI from it) is withheld when the A and B channels disagree, humidity is missing, or the hour is under 75% complete; the other hourly columns are not screened. |
+| **For analysis, use** | `hourly/`, `pm2.5_epa` for PM2.5. These are low-cost sensor data, corrected but not regulatory measurements. |
+
 PurpleAir PA-II sensors deployed at Montana Mesonet stations, archived nightly by the
 Montana Climate Office. Source code: <https://github.com/mt-climate-office/mesonet-aq>.
 Explorer: <https://mesonet.climate.umt.edu/air/>.
@@ -18,6 +27,8 @@ station and file.
 | `latest/latest.json`, `latest/latest.parquet` | most recent hour + NowCast AQI per station | nightly |
 | `raw/station=<id>/year=YYYY/<id>_YYYY-MM.parquet` | ~2-minute A/B channel readings, one file per station-month | nightly (current month) |
 | `hourly/station=<id>/year=YYYY/<id>_YYYY.parquet` | hourly means, EPA-corrected PM2.5, NowCast, AQI, one file per station-year | nightly (current year) |
+
+`raw/` holds the un-averaged readings, not the API's responses as received: the requested fields, stored as float32 Parquet.
 
 All times are UTC. Partitions follow the UTC day.
 
